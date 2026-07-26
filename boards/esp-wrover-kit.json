@@ -47,6 +47,6 @@
     "require_upload_port": true,
     "speed": 460800
   },
-  "url": "https://espressif.com/en/products/hardware/esp-wrover-kit/overview",
+  "url": "https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32/esp-wrover-kit/index.html",
   "vendor": "Espressif"
 }

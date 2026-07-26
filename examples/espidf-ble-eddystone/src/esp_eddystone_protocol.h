@@ -59,7 +59,7 @@ typedef struct {
     uint16_t   batt;           /*<! battery voltage, 1mV/bit */
     uint16_t   temp;           /*<! beacon temperature */
     uint32_t   adv_count;      /*<! adv pdu count since power-on or reboot */
-    uint32_t   time;           /*<! time sence power-on or reboot, a 0.1 second resolution counter */
+    uint32_t   time;           /*<! time since power-on or reboot, a 0.1 second resolution counter */
 } __attribute__((packed)) esp_eddystone_tlm_t;
 
 /*  AD Structure of flags */

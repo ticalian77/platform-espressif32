@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2021 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2021-2024 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Unlicense OR CC0-1.0
  */
@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <inttypes.h>
 
 #include "esp_bt.h"
 #include "nvs_flash.h"
@@ -38,8 +39,8 @@ static esp_ble_scan_params_t ble_scan_params = {
     .scan_type              = BLE_SCAN_TYPE_ACTIVE,
     .own_addr_type          = BLE_ADDR_TYPE_PUBLIC,
     .scan_filter_policy     = BLE_SCAN_FILTER_ALLOW_ALL,
-    .scan_interval          = 0x50,
-    .scan_window            = 0x30,
+    .scan_interval          = ESP_BLE_GAP_SCAN_ITVL_MS(50),
+    .scan_window            = ESP_BLE_GAP_SCAN_WIN_MS(30),
     .scan_duplicate         = BLE_SCAN_DUPLICATE_DISABLE
 };
 
@@ -51,9 +52,9 @@ static void esp_eddystone_show_inform(const esp_eddystone_result_t* res)
             ESP_LOGI(DEMO_TAG, "Eddystone UID inform:");
             ESP_LOGI(DEMO_TAG, "Measured power(RSSI at 0m distance):%d dbm", res->inform.uid.ranging_data);
             ESP_LOGI(DEMO_TAG, "EDDYSTONE_DEMO: Namespace ID:0x");
-            esp_log_buffer_hex(DEMO_TAG, res->inform.uid.namespace_id, 10);
+            ESP_LOG_BUFFER_HEX(DEMO_TAG, res->inform.uid.namespace_id, 10);
             ESP_LOGI(DEMO_TAG, "EDDYSTONE_DEMO: Instance ID:0x");
-            esp_log_buffer_hex(DEMO_TAG, res->inform.uid.instance_id, 6);
+            ESP_LOG_BUFFER_HEX(DEMO_TAG, res->inform.uid.instance_id, 6);
             break;
         }
         case EDDYSTONE_FRAME_TYPE_URL: {
@@ -67,8 +68,8 @@ static void esp_eddystone_show_inform(const esp_eddystone_result_t* res)
             ESP_LOGI(DEMO_TAG, "version: %d", res->inform.tlm.version);
             ESP_LOGI(DEMO_TAG, "battery voltage: %d mV", res->inform.tlm.battery_voltage);
             ESP_LOGI(DEMO_TAG, "beacon temperature in degrees Celsius: %6.1f", res->inform.tlm.temperature);
-            ESP_LOGI(DEMO_TAG, "adv pdu count since power-up: %d", res->inform.tlm.adv_count);
-            ESP_LOGI(DEMO_TAG, "time since power-up: %d s", (res->inform.tlm.time)/10);
+            ESP_LOGI(DEMO_TAG, "adv pdu count since power-up: %" PRIu32, res->inform.tlm.adv_count);
+            ESP_LOGI(DEMO_TAG, "time since power-up: %" PRIu32 " s", (res->inform.tlm.time)/10);
             break;
         }
         default:
@@ -83,6 +84,7 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t* par
     switch(event)
     {
         case ESP_GAP_BLE_SCAN_PARAM_SET_COMPLETE_EVT: {
+            // the unit of the duration is second, 0 means scan permanently
             uint32_t duration = 0;
             esp_ble_gap_start_scanning(duration);
             break;
@@ -110,10 +112,10 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t* par
                         return;
                     } else {
                         // The received adv data is a correct eddystone frame packet.
-                        // Here, we get the eddystone infomation in eddystone_res, we can use the data in res to do other things.
+                        // Here, we get the eddystone information in eddystone_res, we can use the data in res to do other things.
                         // For example, just print them:
                         ESP_LOGI(DEMO_TAG, "--------Eddystone Found----------");
-                        esp_log_buffer_hex("EDDYSTONE_DEMO: Device address:", scan_result->scan_rst.bda, ESP_BD_ADDR_LEN);
+                        ESP_LOG_BUFFER_HEX("EDDYSTONE_DEMO: Device address:", scan_result->scan_rst.bda, ESP_BD_ADDR_LEN);
                         ESP_LOGI(DEMO_TAG, "RSSI of packet:%d dbm", scan_result->scan_rst.rssi);
                         esp_eddystone_show_inform(&eddystone_res);
                     }
@@ -153,7 +155,8 @@ void esp_eddystone_appRegister(void)
 
 void esp_eddystone_init(void)
 {
-    esp_bluedroid_init();
+    esp_bluedroid_config_t cfg = BT_BLUEDROID_INIT_CONFIG_DEFAULT();
+    esp_bluedroid_init_with_cfg(&cfg);
     esp_bluedroid_enable();
     esp_eddystone_appRegister();
 }

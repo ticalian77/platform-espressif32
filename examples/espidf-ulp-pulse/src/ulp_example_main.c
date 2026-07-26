@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2023-2024 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Unlicense OR CC0-1.0
+ */
 /* ULP Example
 
    This example code is in the Public Domain (or CC0 licensed, at your option.)
@@ -8,6 +13,7 @@
 */
 
 #include <stdio.h>
+#include <inttypes.h>
 #include "esp_sleep.h"
 #include "nvs.h"
 #include "nvs_flash.h"
@@ -18,6 +24,8 @@
 #include "driver/rtc_io.h"
 #include "ulp.h"
 #include "ulp_main.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 extern const uint8_t ulp_main_bin_start[] asm("_binary_ulp_main_bin_start");
 extern const uint8_t ulp_main_bin_end[]   asm("_binary_ulp_main_bin_end");
@@ -27,8 +35,15 @@ static void update_pulse_count(void);
 
 void app_main(void)
 {
-    esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
-    if (cause != ESP_SLEEP_WAKEUP_ULP) {
+    /* If user is using USB-serial-jtag then idf monitor needs some time to
+    *  re-connect to the USB port. We wait 1 sec here to allow for it to make the reconnection
+    *  before we print anything. Otherwise the chip will go back to sleep again before the user
+    *  has time to monitor any output.
+    */
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    uint32_t causes = esp_sleep_get_wakeup_causes();
+    if (!(causes & BIT(ESP_SLEEP_WAKEUP_ULP))) {
         printf("Not ULP wakeup, initializing ULP\n");
         init_ulp_program();
     } else {
@@ -97,27 +112,27 @@ static void init_ulp_program(void)
 
 static void update_pulse_count(void)
 {
-    const char* namespace = "plusecnt";
+    const char* nvs_namespace = "plusecnt";
     const char* count_key = "count";
 
     ESP_ERROR_CHECK( nvs_flash_init() );
     nvs_handle_t handle;
-    ESP_ERROR_CHECK( nvs_open(namespace, NVS_READWRITE, &handle));
+    ESP_ERROR_CHECK( nvs_open(nvs_namespace, NVS_READWRITE, &handle));
     uint32_t pulse_count = 0;
     esp_err_t err = nvs_get_u32(handle, count_key, &pulse_count);
     assert(err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND);
-    printf("Read pulse count from NVS: %5d\n", pulse_count);
+    printf("Read pulse count from NVS: %5" PRIu32"\n", pulse_count);
 
     /* ULP program counts signal edges, convert that to the number of pulses */
     uint32_t pulse_count_from_ulp = (ulp_edge_count & UINT16_MAX) / 2;
     /* In case of an odd number of edges, keep one until next time */
     ulp_edge_count = ulp_edge_count % 2;
-    printf("Pulse count from ULP: %5d\n", pulse_count_from_ulp);
+    printf("Pulse count from ULP: %5" PRIu32"\n", pulse_count_from_ulp);
 
     /* Save the new pulse count to NVS */
     pulse_count += pulse_count_from_ulp;
     ESP_ERROR_CHECK(nvs_set_u32(handle, count_key, pulse_count));
     ESP_ERROR_CHECK(nvs_commit(handle));
     nvs_close(handle);
-    printf("Wrote updated pulse count to NVS: %5d\n", pulse_count);
+    printf("Wrote updated pulse count to NVS: %5" PRIu32"\n", pulse_count);
 }
